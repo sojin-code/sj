@@ -1,1 +1,30 @@
+// 방재기상관측 센터의 포인트 한정
+var point = ee.Geometry.Point([127.00981, 37.63801]);  // Replace with your coordinates
 
+
+// ERA5-Land Daily Aggregated dataset 사용
+var era5 = ee.ImageCollection("ECMWF/ERA5_LAND/DAILY_AGGR")
+    .select('surface_solar_radiation_downwards_sum')
+    .filterDate('2023-01-01', '2023-12-31');  // Specify your date range
+
+// 특정 포인트의 일조량 extract 
+var solarRadiationAtPoint = era5.map(function(image) {
+    var value = image.reduceRegion({
+        reducer: ee.Reducer.first(),
+        geometry: point,
+        scale: 1000  // Spatial resolution in meters
+    }).get('surface_solar_radiation_downwards_sum');
+    return image.set('solar_radiation', value).set('date', image.date().format('YYYY-MM-dd'));
+});
+
+// ImageCollection to FeatureCollection
+var solarFeatureCollection = solarRadiationAtPoint.map(function(image) {
+    return ee.Feature(null, image.toDictionary());
+});
+
+// csv 파일로 저장 
+Export.table.toDrive({
+    collection: solarFeatureCollection,
+    description: 'SolarRadiation_2023',
+    fileFormat: 'CSV'
+});
