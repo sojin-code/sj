@@ -1,0 +1,32 @@
+import pandas as pd
+import numpy as np
+
+# 인코딩
+file_path = ''
+data = pd.read_csv(file_path, encoding='utf-8')
+
+# 범위 확인
+data['Temp'] = data['Temp'].clip(lower=-10, upper=50)  # 단위: Celsius
+data['humidity(%)'] = data['humidity(%)'].clip(lower=10, upper=100)  # 단위: %
+data['solar(W/m²)'] = data['solar(W/m²)'].clip(lower=15, upper=300)  # 단위: W/m²
+data['wind_speed'] = data['wind_speed'].clip(lower=0.5)  # 단위: 0.5 m/s
+
+# Stull's approximation for Tnwb
+def calculate_stull_tnwb(air_temp, humidity):
+    return air_temp - ((100 - humidity) / 5)
+
+# Tg 
+def calculate_tg(air_temp, solar_radiation, wind_speed):
+    return air_temp + 2.5 * ((solar_radiation / (wind_speed + 10)) ** 0.5)
+
+data['Tnwb_Stull'] = calculate_stull_tnwb(data['Temp'], data['humidity(%)'])
+data['Tg'] = calculate_tg(data['Temp'], data['solar(W/m²)'], data['wind_speed'])
+
+#WBGT
+data['WBGT_Outdoor'] = 0.7 * data['Tnwb_Stull'] + 0.2 * data['Tg'] + 0.1 * data['Temp']
+
+# 
+output_path = ''
+data.to_csv(output_path, index=False)
+
+print(data[['Temp', 'humidity(%)', 'solar(W/m²)', 'wind_speed', 'Tnwb_Stull', 'Tg', 'WBGT_Outdoor']].head())
