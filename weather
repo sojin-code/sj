@@ -1,0 +1,52 @@
+// --------------------------------------------
+// ERA5 Daily 2m Temperature Export (°C)
+// Area: Seoul
+// Year: 2018
+// Output: Daily GeoTIFFs to Google Drive
+// --------------------------------------------
+
+// 1. Define Area of Interest (AOI) - Seoul
+var seoul = ee.Geometry.Rectangle([126.76, 37.41, 127.2, 37.7]);
+Map.centerObject(seoul, 9);
+
+// 2. Define Time Range
+var startDate = ee.Date('2018-07-01');
+var endDate = ee.Date('2018-09-01'); // end is exclusive
+
+// 3. Load ERA5-Land hourly data and select 2m temperature
+var era5 = ee.ImageCollection("ECMWF/ERA5_LAND/HOURLY")
+  .filterDate(startDate, endDate)
+  .filterBounds(seoul)
+  .select('temperature_2m');  // Kelvin
+
+// 4. Generate list of formatted date strings: 'YYYY_MM_dd'
+var nDays = endDate.difference(startDate, 'day');
+var dateList = ee.List.sequence(0, nDays.subtract(1)).map(function(dayOffset) {
+  return startDate.advance(dayOffset, 'day').format('YYYY_MM_dd');
+});
+
+// 5. Evaluate and loop through date strings
+dateList.evaluate(function(dateStrings) {
+  dateStrings.forEach(function(dateStr) {
+    var day = ee.Date.parse('YYYY_MM_dd', dateStr);
+    var nextDay = day.advance(1, 'day');
+
+    var dailyMean = era5
+      .filterDate(day, nextDay)
+      .mean()
+      .subtract(273.15)  // Convert Kelvin to Celsius
+      .clip(seoul)
+      .rename('temperature_C');
+
+    Export.image.toDrive({
+      image: dailyMean,
+      description: 'ERA5_Temp_Seoul_' + dateStr,
+      folder: 'ERA5_Seoul_2018',
+      fileNamePrefix: 'ERA5_Temp_Seoul_' + dateStr,
+      region: seoul,
+      scale: 1000,
+      crs: 'EPSG:4326',
+      maxPixels: 1e13
+    });
+  });
+});
